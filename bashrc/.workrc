@@ -1,0 +1,92 @@
+gdbs=$eshel/prebuilt/android-arm/gdbserver/gdbserver
+
+#alias adb='/home/administrator/disk140gb/eshel_codeline1_ns/out/host/linux-x86/bin/adb'
+alias ash='adb shell'
+#alias apush='adb push'
+
+alias cdqc='cd ~/work/src/qc/current_release/LINUX/android'
+alias cdfca='cd ~/work/src/aws/msm8996au-fca/LINUX/android'
+alias cdces='cd ~/work/src/aws/msm8996au-ces/LINUX/android'
+alias cdout='cd ./out/target/product/msm8996'
+
+gdbpush()
+{
+	arm
+	apush $gdbs /system/bin
+}
+adbpush()
+{
+	arm
+	apush $1 $2
+}
+gdbattach()
+{
+	local pid=$1
+	local serial_client='(.*    |.*\./)mtilatcmd -S -e'
+	local ttyACM_client='(.*    |.*\./)mtilatcmd -m'
+	if [[ -z $pid ]]; then
+		pid=`ash ps | grep -E "$serial_client" | awk '{ print $1 }'`
+	fi
+	if [[ -n $pid ]]; then
+		ash "gdbserver 192.168.1.2:8080 --attach $pid"
+	else
+		echo mtilatcmd process not found
+	fi
+}
+
+gdbconn()
+{
+	local prog=$1
+	if [[ -z $prog ]]; then
+		prog=mtilatcmd
+	elif [[ -n $TARGETPROG ]]; then
+		prog=$TARGETPROG
+	fi
+
+	local prog=$eshel/vendor/marvell/generic/telephony/mtil/ATCMDSRV/MTILatcmd/objs_$prog/$prog
+
+	local armgdb_tui=$eshel/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-gdbtui
+	local armgdb=$eshel/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/arm-eabi-gdb
+	local gdbinit=~/gdbinit.mtilatcmd
+
+	local gdbcmd=$armgdb
+	if [[ $opt == "tui" ]]; then
+		gdbcmd=$armgdb_tui
+	fi
+
+	local gui=$2
+	if [[ $gui == "ddd" ]]; then
+		ddd --debugger "$gdbcmd $prog -x $gdbinit"
+	else
+		$gdbcmd $prog -x $gdbinit
+	fi
+}
+
+dddconn()
+{
+	gdbconn $@ ddd
+}
+
+PATH=~/bin/:$PATH
+
+FILE_EXT="cpp c h json sh lua js init"
+
+index() {
+	local ext
+	if [ -f ./cscope.files ]
+	then
+	    rm -f ./cscope.files
+	fi
+	
+	for i in $@
+	do
+	    for ext in $FILE_EXT
+	    do
+	        eval "find \"$PWD/$i\" -type f -name '*.$ext' >> cscope.files "
+	    done
+	done
+	cscope -b
+	ctags -L ./cscope.files
+}
+
+export USE_CCACHE=1
